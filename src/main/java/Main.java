@@ -5,7 +5,8 @@ import java.nio.charset.StandardCharsets;
 public class Main {
     public static void main(String[] args) {
 
-        Server server = new Server();
+        final var server = new Server(9999);
+
         server.addHandler("GET", "/messages", (request, responseStream) -> {
             String text = "<h1>GET /messages</h1>\n" +
                     "Headers: " + request.getHeaders();
@@ -23,22 +24,25 @@ public class Main {
     }
 
     private static void writeAnyData(String content, BufferedOutputStream out) {
-        String respBuilder = "HTTP/1.1 200 OK\r\n" +
-                "Content-Type: text/html\r\n" +
-                "Content-Length: " + content.length() + "\r\n" +
-                "Connection: close\r\n" +
-                "\r\n";
+
+        final var builder = new StringBuilder();
+
+        builder
+                .append("HTTP/1.1 200 OK\r\n" + "Content-Type: text/html\r\n" + "Content-Length: ")
+                .append(content.length())
+                .append("\r\n")
+                .append("Connection: close\r\n")
+                .append("\r\n");
 
         try {
-            out.write(respBuilder.getBytes());
+            out.write(builder.toString().getBytes());
             out.write(content.getBytes(StandardCharsets.UTF_8));
-            System.out.println(respBuilder);
+
+            System.out.println(builder);
             System.out.println(content);
 
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
-
-
 }

@@ -1,3 +1,5 @@
+import lombok.AllArgsConstructor;
+
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -12,7 +14,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 
+@AllArgsConstructor
 public class Server {
+
+    private int port = 9999;
 
     private static final List<String> VALID_PATHS = List.of(
             "/index.html", "/spring.svg", "/spring.png",
@@ -21,7 +26,6 @@ public class Server {
             "/events.html", "/events.js"
     );
 
-    private static final int PORT = 9999;
     private static final int THREADS_COUNT = 64;
 
     private final Map<String, Handler> HANDLERS = new ConcurrentHashMap<>();
@@ -29,7 +33,7 @@ public class Server {
     public void start() {
         final var executorService = Executors.newFixedThreadPool(THREADS_COUNT);
 
-        try (final var serverSocket = new ServerSocket(PORT)) {
+        try (ServerSocket serverSocket = new ServerSocket(port)) {
             while (true) {
                 try {
                     final var socket = serverSocket.accept();
@@ -61,7 +65,8 @@ public class Server {
 
     private void handleConnection(Socket socket) throws IOException {
         try (BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-             BufferedOutputStream out = new BufferedOutputStream(socket.getOutputStream())) {
+
+            final var out = new BufferedOutputStream(socket.getOutputStream())) {
 
             final var request = getRequest(in);
             if (request == null) {
@@ -71,6 +76,7 @@ public class Server {
 
             final var handler = HANDLERS.get(request.getMethod() + " " + request.getPath());
             if (handler == null) {
+
                 if (!VALID_PATHS.contains(request.getPath())) {
                     makeNotFoundResponse(out);
                 } else {
@@ -99,11 +105,14 @@ public class Server {
         boolean hasBody = false;
 
         String inputLine = in.readLine();
+
         while (inputLine.length() > 0) {
             headers.append(inputLine);
+
             if (inputLine.startsWith("Content-Length: ")) {
                 int index = inputLine.indexOf(':') + 1;
                 String len = inputLine.substring(index).trim();
+
                 if (Integer.parseInt(len) > 0) {
                     hasBody = true;
                 }
@@ -135,19 +144,31 @@ public class Server {
     }
 
     private void writeStatusAndHeaders(ResponseData data, BufferedOutputStream out) throws IOException {
-        final var respBuilder = new StringBuilder();
+        final var builder = new StringBuilder();
 
-        respBuilder.append("HTTP/1.1 ").append(data.getCode()).append(" ").append(data.getDescription()).append("\r\n");
+        builder
+                .append("HTTP/1.1 ")
+                .append(data.getCode())
+                .append(" ")
+                .append(data.getDescription())
+                .append("\r\n");
 
         if (data.getContentType() != null) {
-            respBuilder.append("Content-Type: ").append(data.getContentType()).append("\r\n");
+
+            builder
+                    .append("Content-Type: ")
+                    .append(data.getContentType())
+                    .append("\r\n");
         }
 
-        respBuilder.append("Content-Length: ").append(data.getContentLength()).append("\r\n");
-        respBuilder.append("Connection: close\r\n");
-        respBuilder.append("\r\n");
+        builder
+                .append("Content-Length: ")
+                .append(data.getContentLength())
+                .append("\r\n")
+                .append("Connection: close\r\n")
+                .append("\r\n");
 
-        out.write(respBuilder.toString().getBytes());
+        out.write(builder.toString().getBytes());
     }
 
     private void makeResponseWithContent(BufferedOutputStream out, String path) throws IOException {
@@ -157,6 +178,7 @@ public class Server {
         // special case for classic
         if (path.equals("/classic.html")) {
             String template = Files.readString(filePath);
+
             byte[] content = template.replace(
                     "{time}",
                     LocalDateTime.now().toString()

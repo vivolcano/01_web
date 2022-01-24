@@ -14,10 +14,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 
-@AllArgsConstructor
 public class Server {
-
-    private int port = 9999;
 
     private static final List<String> VALID_PATHS = List.of(
             "/index.html", "/spring.svg", "/spring.png",
@@ -28,9 +25,16 @@ public class Server {
 
     private static final int THREADS_COUNT = 64;
 
-    private final Map<String, Handler> HANDLERS = new ConcurrentHashMap<>();
+    private final int port;
+    private final Map<String, Handler> handlerMap;
+
+    public Server(int port) {
+        this.port = port;
+        this.handlerMap = new ConcurrentHashMap<>();
+    }
 
     public void start() {
+
         final var executorService = Executors.newFixedThreadPool(THREADS_COUNT);
 
         try (ServerSocket serverSocket = new ServerSocket(port)) {
@@ -38,7 +42,6 @@ public class Server {
                 try {
                     final var socket = serverSocket.accept();
                     executorService.submit(getServerTask(socket));
-
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -49,7 +52,7 @@ public class Server {
     }
 
     public void addHandler(String method, String path, Handler handler) {
-        HANDLERS.put(method + " " + path, handler);
+        handlerMap.put(method + " " + path, handler);
     }
 
     private Runnable getServerTask(Socket socket) {
@@ -65,18 +68,17 @@ public class Server {
 
     private void handleConnection(Socket socket) throws IOException {
         try (BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+             BufferedOutputStream out = new BufferedOutputStream(socket.getOutputStream())) {
 
-            final var out = new BufferedOutputStream(socket.getOutputStream())) {
+            final var request = Request.getRequest(in);
 
-            final var request = getRequest(in);
             if (request == null) {
-                // just close socket
                 return;
             }
 
-            final var handler = HANDLERS.get(request.getMethod() + " " + request.getPath());
-            if (handler == null) {
+            final var handler = handlerMap.get(request.getMethod() + " " + request.getPath());
 
+            if (handler == null) {
                 if (!VALID_PATHS.contains(request.getPath())) {
                     makeNotFoundResponse(out);
                 } else {
@@ -89,61 +91,13 @@ public class Server {
         }
     }
 
-    private Request getRequest(BufferedReader in) throws IOException {
-        // read only request line for simplicity
-        // must be in form GET /path HTTP/1.1
-        final var requestLine = in.readLine();
-        final String [] parts = requestLine.split(" ");
-
-        if (parts.length != 3) {
-            // just close socket
-            return null;
-        }
-
-        final var headers = new StringBuilder();
-        final var body = new StringBuilder();
-        boolean hasBody = false;
-
-        String inputLine = in.readLine();
-
-        while (inputLine.length() > 0) {
-            headers.append(inputLine);
-
-            if (inputLine.startsWith("Content-Length: ")) {
-                int index = inputLine.indexOf(':') + 1;
-                String len = inputLine.substring(index).trim();
-
-                if (Integer.parseInt(len) > 0) {
-                    hasBody = true;
-                }
-            }
-            inputLine = in.readLine();
-        }
-
-        if (hasBody) {
-            inputLine = in.readLine();
-            while (inputLine != null && inputLine.length() > 0) {
-                body.append(inputLine);
-                inputLine = in.readLine();
-            }
-        }
-
-        return new Request(parts[0], getCleanPath(parts[1]), headers.toString(), body.toString());
-    }
-
-    private String getCleanPath(String path) {
-        if (path.contains("?")) {
-            return path.substring(0, path.indexOf("?"));
-        }
-        return path;
-    }
-
     private void makeNotFoundResponse(BufferedOutputStream out) throws IOException {
         final var responseData = new ResponseData(404, "Not Found", null, 0);
         writeStatusAndHeaders(responseData, out);
     }
 
     private void writeStatusAndHeaders(ResponseData data, BufferedOutputStream out) throws IOException {
+
         final var builder = new StringBuilder();
 
         builder
@@ -172,17 +126,13 @@ public class Server {
     }
 
     private void makeResponseWithContent(BufferedOutputStream out, String path) throws IOException {
+
         final var filePath = Path.of(".", "public", path);
         final var mimeType = Files.probeContentType(filePath);
 
-        // special case for classic
         if (path.equals("/classic.html")) {
-            String template = Files.readString(filePath);
-
-            byte[] content = template.replace(
-                    "{time}",
-                    LocalDateTime.now().toString()
-            ).getBytes();
+            final var template = Files.readString(filePath);
+            final byte[] content = template.replace("{time}", LocalDateTime.now().toString()).getBytes();
 
             final var responseData = new ResponseData(200, "OK", mimeType, content.length);
 
@@ -190,7 +140,6 @@ public class Server {
             out.write(content);
 
         } else {
-
             final var length = Files.size(filePath);
             final var responseData = new ResponseData(200, "OK", mimeType, length);
 
@@ -198,6 +147,4 @@ public class Server {
             Files.copy(filePath, out);
         }
     }
-
 }
-

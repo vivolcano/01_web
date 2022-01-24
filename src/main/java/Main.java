@@ -8,22 +8,32 @@ public class Main {
         final var server = new Server(9999);
 
         server.addHandler("GET", "/messages", (request, responseStream) -> {
-            String text = "<h1>GET /messages</h1>\n" +
-                    "Headers: " + request.getHeaders();
-            writeAnyData(text, responseStream);
+            final var txt = "<h1>GET /messages</h1>\n" +
+                    "<div>Path: " + request.getPath() + "</div>" +
+                    "<div>Params: " + request.getQueryParams() + "</div>" +
+                    "<div>Param key1: " + request.getQueryParam("key1") + "</div>" +
+                    "<div>Headers: " + request.getHeaders() + "</div>";
+
+            write(txt, responseStream);
         });
 
         server.addHandler("POST", "/messages", (request, responseStream) -> {
-            String text = "<h1>POST /messages</h1>\n" +
-                    "Headers: " + request.getHeaders() + "\n" +
-                    "Body: " + request.getBody();
-            writeAnyData(text, responseStream);
+            final var txt = "<h1>POST /messages</h1>\n" +
+                    "<div>Path: " + request.getPath() + "</div>" +
+                    "<div>Params: " + request.getQueryParams() + "</div>" +
+                    "<div>Param key1: " + request.getQueryParam("key1") + "</div>" +
+                    "<div>Headers: " + request.getHeaders() + "</div>" +
+                    "<div>Body: " + request.getBody() + "</div>" +
+                    "<div>PostParams: " + request.getPostParams() + "</div>" +
+                    "<div>PostParam value: " + request.getPostParam("value") + "</div>";
+
+            write(txt, responseStream);
         });
 
         server.start();
     }
 
-    private static void writeAnyData(String content, BufferedOutputStream out) {
+    private static void write(String content, BufferedOutputStream out) {
 
         final var builder = new StringBuilder();
 
@@ -45,4 +55,5 @@ public class Main {
             e.printStackTrace();
         }
     }
+    
 }
